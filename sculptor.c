@@ -32,7 +32,7 @@ int main(int argc, char **argv) {
         exit(1);
     }
 
-    energy_row_t *energies = energies_init(original_width, original_height);
+    double **energies = energies_init(original_width, original_height);
     seams_t *seams = seams_init(original_width, original_height);
 
     for (int iteration = 0; iteration < to_carve; iteration++) {
@@ -79,11 +79,11 @@ im_t *image_load(char *filename) {
         exit(1);
     }
 
-    // Initialize custom image struct
-    row_t *rows = malloc(height * sizeof(row_t));
+    // Convert pixel data to 2d arrays
+    rgb_pixel_t **pixels = malloc(height * sizeof(rgb_pixel_t *));
     for (unsigned int y = 0; y < height; y++) {
-        rows[y].pixels = malloc(width * sizeof(rgb_pixel_t));
-        memcpy(rows[y].pixels, &input[y * width * sizeof(rgb_pixel_t)],
+        pixels[y] = malloc(width * sizeof(rgb_pixel_t));
+        memcpy(pixels[y], &input[y * width * sizeof(rgb_pixel_t)],
                width * sizeof(rgb_pixel_t));
     }
 
@@ -92,7 +92,7 @@ im_t *image_load(char *filename) {
     im_t *image = malloc(sizeof(im_t));
     image->width = width;
     image->height = height;
-    image->rows = rows;
+    image->pixels = pixels;
 
     return image;
 }
@@ -102,7 +102,7 @@ void image_save(im_t *image, char *filename) {
 
     unsigned char *raw = malloc(width * height * sizeof(rgb_pixel_t));
     for (unsigned int row = 0; row < height; row++) {
-        memcpy(&raw[row * width * sizeof(rgb_pixel_t)], image->rows[row].pixels,
+        memcpy(&raw[row * width * sizeof(rgb_pixel_t)], image->pixels[row],
                width * sizeof(rgb_pixel_t));
     }
 
@@ -131,7 +131,7 @@ double energy(im_t *im, int x, int y) {
         int row = y + row_offset;
         if ((row < 0) || (row >= height))
             continue;
-        rgb_pixel_t *row_pixels = im->rows[row].pixels;
+        rgb_pixel_t *row_pixels = im->pixels[row];
         for (int col_offset = -1; col_offset <= 1; col_offset++) {
             int col = x + col_offset;
             if ((col < 0) || (col >= width))
@@ -147,25 +147,25 @@ double energy(im_t *im, int x, int y) {
     return sqrt(x_energy * x_energy + y_energy * y_energy);
 }
 
-energy_row_t *energies_init(unsigned int width, unsigned int height) {
-    energy_row_t *energies = malloc(height * sizeof(energy_row_t));
+double **energies_init(unsigned int width, unsigned int height) {
+    double **energies = malloc(height * sizeof(double *));
     for (unsigned int row = 0; row < height; row++) {
-        energies[row].energies = malloc(width * sizeof(double));
+        energies[row] = malloc(width * sizeof(double));
     }
     return energies;
 }
 
-void calculate_energies(energy_row_t *energies, im_t *image) {
+void calculate_energies(double **energies, im_t *image) {
     for (unsigned int row = 0; row < image->height; row++) {
         for (unsigned int col = 0; col < image->width; col++) {
-            energies[row].energies[col] = energy(image, col, row);
+            energies[row][col] = energy(image, col, row);
         }
     }
 }
 
-void energies_destroy(energy_row_t *energies, unsigned int original_height) {
+void energies_destroy(double **energies, unsigned int original_height) {
     for (unsigned int row = 0; row < original_height; row++) {
-        free(energies[row].energies);
+        free(energies[row]);
     }
     free(energies);
 }
@@ -182,11 +182,11 @@ seams_t *seams_init(unsigned int width, unsigned int height) {
     return seams;
 }
 
-void fill_seams(seams_t *seams, energy_row_t *energies, im_t *image) {
+void fill_seams(seams_t *seams, double **energies, im_t *image) {
     unsigned int width = image->width, height = image->height;
 
     for (unsigned int col = 0; col < width; col++) {
-        seams->prev_row[col].energy = energies[0].energies[col];
+        seams->prev_row[col].energy = energies[0][col];
         seams->prev_row[col].positions[0] = col;
     }
 
@@ -200,7 +200,7 @@ void fill_seams(seams_t *seams, energy_row_t *energies, im_t *image) {
             if ((right) && right->energy < min_seam->energy) min_seam = right;
             if ((left) && left->energy < min_seam->energy) min_seam = left;
 
-            seams->current_row[col].energy = min_seam->energy + energies[row].energies[col];
+            seams->current_row[col].energy = min_seam->energy + energies[row][col];
             memcpy(seams->current_row[col].positions, min_seam->positions,
                    row * sizeof(unsigned int));
             seams->current_row[col].positions[row] = col;
@@ -216,8 +216,8 @@ void fill_seams(seams_t *seams, energy_row_t *energies, im_t *image) {
 void remove_seam(im_t *image, seam_t *seam) {
     for (unsigned int row = 0; row < image->height; row++) {
         unsigned int to_remove = seam->positions[row];
-        memmove(&image->rows[row].pixels[to_remove],
-                &image->rows[row].pixels[to_remove + 1],
+        memmove(&image->pixels[row][to_remove],
+                &image->pixels[row][to_remove + 1],
                 (image->width - to_remove - 1) * sizeof(rgb_pixel_t));
     }
     image->width--;
@@ -235,8 +235,8 @@ void seams_destroy(seams_t *seams, unsigned int original_width) {
 
 void image_destroy(im_t *image, unsigned int original_height) {
     for (unsigned int row = 0; row < original_height; row++) {
-        free(image->rows[row].pixels);
+        free(image->pixels[row]);
     }
-    free(image->rows);
+    free(image->pixels);
     free(image);
 }
