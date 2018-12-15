@@ -1,10 +1,11 @@
+#include "sculptor.h"
 #include <assert.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include "lodepng.h"
-#include "sculptor.h"
 
 int main(int argc, char **argv) {
     // Verify and extract arguments
@@ -16,6 +17,8 @@ int main(int argc, char **argv) {
     char *output_name = argv[2];
     int to_carve = atoi(argv[3]);
     assert(to_carve >= 0);
+
+    int start = clock();
 
     // Load input image
     im_t *image = image_load(input_name);
@@ -33,8 +36,15 @@ int main(int argc, char **argv) {
     seams_t *seams = seams_init(original_width, original_height);
 
     for (int iteration = 0; iteration < to_carve; iteration++) {
+        int energy_start = clock();
         calculate_energies(energies, image);
+        int energy_end = clock();
+        printf("Energy time consumed: %ld ms\n", (energy_end - energy_start) * 1000 / CLOCKS_PER_SEC);
+
+        int seams_start = clock();
         fill_seams(seams, energies, image);
+        int seams_end = clock();
+        printf("Seams time consumed: %ld ms\n", (seams_end - seams_start) * 1000 / CLOCKS_PER_SEC);
 
         seam_t *lowest_energy_seam = &seams->current_row[0];
         for (unsigned int col = 1; col < image->width; col++) {
@@ -52,6 +62,10 @@ int main(int argc, char **argv) {
     energies_destroy(energies, original_height);
     seams_destroy(seams, original_width);
     image_destroy(image, original_height);
+
+    int end = clock();
+    printf("Time consumed: %ld ms\n", (end - start) * 1000 / CLOCKS_PER_SEC);
+
     return 0;
 }
 
