@@ -210,11 +210,7 @@ void fill_seams(seam_t **seams, double **energies, im_t *image) {
         seams[0][col].positions[0] = col;
     }
 
-    clock_t sum_rewrite = 0;
-    clock_t sum_findmin = 0;
-
     for (uint16_t row = 1; row < height; row++) {
-        clock_t start3 = clock();
         for (uint16_t col = 0; col < width; col++) {
             seam_t *min_seam = &seams[SEAM_PREV_ROW(row)][col];
 
@@ -225,15 +221,10 @@ void fill_seams(seam_t **seams, double **energies, im_t *image) {
             if ((left) && left->energy < min_seam->energy) min_seam = left;
 
             seams[SEAM_CURRENT_ROW(row)][col].energy = min_seam->energy + energies[row][col];
-            memcpy(seams[SEAM_CURRENT_ROW(row)][col].positions, min_seam->positions,
-                   row * sizeof(uint16_t));
+            memcpy(seams[SEAM_CURRENT_ROW(row)][col].positions, min_seam->positions, row * sizeof(uint16_t));
             seams[SEAM_CURRENT_ROW(row)][col].positions[row] = col;
         }
-        clock_t end3 = clock();
-        sum_findmin += (end3 - start3);
-        // printf("Time 3: %ld\n", (end3 - start3) * 1000 / CLOCKS_PER_SEC);
 
-        clock_t start4 = clock();
 #ifndef PERF
         for (uint16_t i = 0; i < width; i++) {
             seams[SEAM_PREV_ROW(row)][i].energy = seams[SEAM_CURRENT_ROW(row)][i].energy;
@@ -241,11 +232,7 @@ void fill_seams(seam_t **seams, double **energies, im_t *image) {
                    (row + 1) * sizeof(uint16_t));
         }
 #endif
-        clock_t end4 = clock();
-        sum_rewrite += end4 - start4;
-        // printf("Time 4: %ld\n", (end4 - start4) * 1000 / CLOCKS_PER_SEC);
     }
-    printf("Min time: %ld, Rewrite time: %ld\n", sum_findmin * 1000 / CLOCKS_PER_SEC, sum_rewrite * 1000 / CLOCKS_PER_SEC);
 }
 
 void remove_seam(im_t *image, seam_t *seam) {
