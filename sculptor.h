@@ -17,11 +17,6 @@ typedef struct seam {
     uint16_t *positions;
 } seam_t;
 
-typedef struct seams {
-    seam_t *prev_row;
-    seam_t *current_row;
-} seams_t;
-
 im_t *image_load(char *filename);
 void image_save(im_t *image, char *filename);
 void image_destroy(im_t *image, uint16_t original_height);
@@ -30,10 +25,10 @@ double **energies_init(uint16_t width, uint16_t height);
 void calculate_energies(double **energies, im_t *image);
 void energies_destroy(double **energies, uint16_t original_height);
 
-seams_t *seams_init(uint16_t width, uint16_t height);
-void fill_seams(seams_t *seams, double **energies, im_t *image);
+seam_t **seams_init(uint16_t width, uint16_t height);
+void fill_seams(seam_t **seams, double **energies, im_t *image);
 void remove_seam(im_t *image, seam_t *seam);
-void seams_destroy(seams_t *seams, uint16_t original_width);
+void seams_destroy(seam_t **seams, uint16_t original_width, uint16_t original_height);
 
 static inline uint16_t brightness(rgb_pixel_t pix);
 static inline int weighted_sum(uint16_t *l, const int8_t *weights, uint16_t len);

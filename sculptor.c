@@ -7,6 +7,18 @@
 #include <time.h>
 #include "lodepng.h"
 
+#ifdef PERF
+#define NUM_SEAM_ROWS(height) (height)
+#define SEAM_PREV_ROW(row) (row - 1)
+#define SEAM_CURRENT_ROW(row) (row)
+#define SEAM_LAST_ROW(image) (image->height - 1)
+#else
+#define NUM_SEAM_ROWS(height) 2
+#define SEAM_PREV_ROW(row) 0
+#define SEAM_CURRENT_ROW(row) 1
+#define SEAM_LAST_ROW(image) 1
+#endif
+
 int main(int argc, char **argv) {
     // Verify and extract arguments
     if (argc != 4) {
@@ -33,7 +45,7 @@ int main(int argc, char **argv) {
     }
 
     double **energies = energies_init(original_width, original_height);
-    seams_t *seams = seams_init(original_width, original_height);
+    seam_t **seams = seams_init(original_width, original_height);
 
     for (int iteration = 0; iteration < to_carve; iteration++) {
         clock_t energy_start = clock();
@@ -46,9 +58,9 @@ int main(int argc, char **argv) {
         clock_t seams_end = clock();
         printf("Seams time consumed: %ld ms\n", (seams_end - seams_start) * 1000 / CLOCKS_PER_SEC);
 
-        seam_t *lowest_energy_seam = &seams->current_row[0];
+        seam_t *lowest_energy_seam = &seams[SEAM_LAST_ROW(image)][0];
         for (uint16_t col = 1; col < image->width; col++) {
-            seam_t *seam = &seams->current_row[col];
+            seam_t *seam = &seams[SEAM_LAST_ROW(image)][col];
             if (seam->energy < lowest_energy_seam->energy) lowest_energy_seam = seam;
         }
 
@@ -60,7 +72,7 @@ int main(int argc, char **argv) {
 
     // Cleanup
     energies_destroy(energies, original_height);
-    seams_destroy(seams, original_width);
+    seams_destroy(seams, original_width, original_height);
     image_destroy(image, original_height);
 
     clock_t end = clock();
@@ -173,24 +185,29 @@ void energies_destroy(double **energies, uint16_t original_height) {
     free(energies);
 }
 
-seams_t *seams_init(uint16_t width, uint16_t height) {
-    seams_t *seams = malloc(sizeof(seams_t));
-    seams->current_row = malloc(width * sizeof(seam_t));
-    seams->prev_row = malloc(width * sizeof(seam_t));
+seam_t **seams_init(uint16_t width, uint16_t height) {
+    seam_t **seams = malloc(NUM_SEAM_ROWS(height) * sizeof(seam_t *));
 
-    for (uint16_t col = 0; col < width; col++) {
-        seams->prev_row[col].positions = malloc(height * sizeof(uint16_t));
-        seams->current_row[col].positions = malloc(height * sizeof(uint16_t));
+    for (uint16_t row = 0; row < NUM_SEAM_ROWS(height); row++) {
+        seams[row] = malloc(width * sizeof(seam_t));
+        for (uint16_t col = 0; col < width; col++) {
+#ifdef PERF
+            seams[row][col].positions = malloc((row + 1) * sizeof(uint16_t));
+#else
+            seams[row][col].positions = malloc(height * sizeof(uint16_t));
+#endif
+        }
     }
+
     return seams;
 }
 
-void fill_seams(seams_t *seams, double **energies, im_t *image) {
+void fill_seams(seam_t **seams, double **energies, im_t *image) {
     uint16_t width = image->width, height = image->height;
 
     for (uint16_t col = 0; col < width; col++) {
-        seams->prev_row[col].energy = energies[0][col];
-        seams->prev_row[col].positions[0] = col;
+        seams[0][col].energy = energies[0][col];
+        seams[0][col].positions[0] = col;
     }
 
     clock_t sum_rewrite = 0;
@@ -199,28 +216,31 @@ void fill_seams(seams_t *seams, double **energies, im_t *image) {
     for (uint16_t row = 1; row < height; row++) {
         clock_t start3 = clock();
         for (uint16_t col = 0; col < width; col++) {
-            seam_t *min_seam = &seams->prev_row[col];
+            seam_t *min_seam = &seams[SEAM_PREV_ROW(row)][col];
 
-            seam_t *right = (col + 1 < width) ? &seams->prev_row[col + 1] : NULL;
-            seam_t *left = (col >= 1) ? &seams->prev_row[col - 1] : NULL;
+            seam_t *right = (col + 1 < width) ? &seams[SEAM_PREV_ROW(row)][col + 1] : NULL;
+            seam_t *left = (col >= 1) ? &seams[SEAM_PREV_ROW(row)][col - 1] : NULL;
 
             if ((right) && right->energy < min_seam->energy) min_seam = right;
             if ((left) && left->energy < min_seam->energy) min_seam = left;
 
-            seams->current_row[col].energy = min_seam->energy + energies[row][col];
-            memcpy(seams->current_row[col].positions, min_seam->positions,
+            seams[SEAM_CURRENT_ROW(row)][col].energy = min_seam->energy + energies[row][col];
+            memcpy(seams[SEAM_CURRENT_ROW(row)][col].positions, min_seam->positions,
                    row * sizeof(uint16_t));
-            seams->current_row[col].positions[row] = col;
+            seams[SEAM_CURRENT_ROW(row)][col].positions[row] = col;
         }
         clock_t end3 = clock();
         sum_findmin += (end3 - start3);
         // printf("Time 3: %ld\n", (end3 - start3) * 1000 / CLOCKS_PER_SEC);
+
         clock_t start4 = clock();
+#ifndef PERF
         for (uint16_t i = 0; i < width; i++) {
-            seams->prev_row[i].energy = seams->current_row[i].energy;
-            memcpy(seams->prev_row[i].positions, seams->current_row[i].positions,
+            seams[SEAM_PREV_ROW(row)][i].energy = seams[SEAM_CURRENT_ROW(row)][i].energy;
+            memcpy(seams[SEAM_PREV_ROW(row)][i].positions, seams[SEAM_CURRENT_ROW(row)][i].positions,
                    (row + 1) * sizeof(uint16_t));
         }
+#endif
         clock_t end4 = clock();
         sum_rewrite += end4 - start4;
         // printf("Time 4: %ld\n", (end4 - start4) * 1000 / CLOCKS_PER_SEC);
@@ -238,13 +258,12 @@ void remove_seam(im_t *image, seam_t *seam) {
     image->width--;
 }
 
-void seams_destroy(seams_t *seams, uint16_t original_width) {
-    for (uint16_t col = 0; col < original_width; col++) {
-        free(seams->prev_row[col].positions);
-        free(seams->current_row[col].positions);
+void seams_destroy(seam_t **seams, uint16_t original_width, uint16_t original_height) {
+    for (uint16_t row = 0; row < NUM_SEAM_ROWS(original_height); row++) {
+        for (uint16_t col = 0; col < original_width; col++)
+            free(seams[row][col].positions);
+        free(seams[row]);
     }
-    free(seams->prev_row);
-    free(seams->current_row);
     free(seams);
 }
 
