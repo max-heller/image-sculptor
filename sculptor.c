@@ -18,13 +18,13 @@ int main(int argc, char **argv) {
     int to_carve = atoi(argv[3]);
     assert(to_carve >= 0);
 
-    int start = clock();
+    clock_t start = clock();
 
     // Load input image
     im_t *image = image_load(input_name);
 
-    int original_width = image->width;
-    int original_height = image->height;
+    uint16_t original_width = image->width;
+    uint16_t original_height = image->height;
     assert((original_width > 1) && (original_height > 1));
 
     if (to_carve >= original_width) {
@@ -36,18 +36,18 @@ int main(int argc, char **argv) {
     seams_t *seams = seams_init(original_width, original_height);
 
     for (int iteration = 0; iteration < to_carve; iteration++) {
-        int energy_start = clock();
+        clock_t energy_start = clock();
         calculate_energies(energies, image);
-        int energy_end = clock();
+        clock_t energy_end = clock();
         printf("Energy time consumed: %ld ms\n", (energy_end - energy_start) * 1000 / CLOCKS_PER_SEC);
 
-        int seams_start = clock();
+        clock_t seams_start = clock();
         fill_seams(seams, energies, image);
-        int seams_end = clock();
+        clock_t seams_end = clock();
         printf("Seams time consumed: %ld ms\n", (seams_end - seams_start) * 1000 / CLOCKS_PER_SEC);
 
         seam_t *lowest_energy_seam = &seams->current_row[0];
-        for (unsigned int col = 1; col < image->width; col++) {
+        for (uint16_t col = 1; col < image->width; col++) {
             seam_t *seam = &seams->current_row[col];
             if (seam->energy < lowest_energy_seam->energy) lowest_energy_seam = seam;
         }
@@ -63,7 +63,7 @@ int main(int argc, char **argv) {
     seams_destroy(seams, original_width);
     image_destroy(image, original_height);
 
-    int end = clock();
+    clock_t end = clock();
     printf("Time consumed: %ld ms\n", (end - start) * 1000 / CLOCKS_PER_SEC);
 
     return 0;
@@ -79,9 +79,12 @@ im_t *image_load(char *filename) {
         exit(1);
     }
 
+    uint16_t swidth = (uint16_t)width, sheight = (uint16_t)height;
+    assert((swidth == width) && (sheight == height));
+
     // Convert pixel data to 2d arrays
     rgb_pixel_t **pixels = malloc(height * sizeof(rgb_pixel_t *));
-    for (unsigned int y = 0; y < height; y++) {
+    for (uint16_t y = 0; y < height; y++) {
         pixels[y] = malloc(width * sizeof(rgb_pixel_t));
         memcpy(pixels[y], &input[y * width * sizeof(rgb_pixel_t)],
                width * sizeof(rgb_pixel_t));
@@ -90,18 +93,18 @@ im_t *image_load(char *filename) {
     free(input);
 
     im_t *image = malloc(sizeof(im_t));
-    image->width = width;
-    image->height = height;
+    image->width = swidth;
+    image->height = sheight;
     image->pixels = pixels;
 
     return image;
 }
 
 void image_save(im_t *image, char *filename) {
-    unsigned int width = image->width, height = image->height;
+    uint32_t width = image->width, height = image->height;
 
     unsigned char *raw = malloc(width * height * sizeof(rgb_pixel_t));
-    for (unsigned int row = 0; row < height; row++) {
+    for (uint32_t row = 0; row < height; row++) {
         memcpy(&raw[row * width * sizeof(rgb_pixel_t)], image->pixels[row],
                width * sizeof(rgb_pixel_t));
     }
@@ -110,22 +113,22 @@ void image_save(im_t *image, char *filename) {
     free(raw);
 }
 
-static inline int brightness(rgb_pixel_t pix) { return pix.red + pix.green + pix.blue; }
+static inline uint16_t brightness(rgb_pixel_t pix) { return pix.red + pix.green + pix.blue; }
 
-static inline int weighted_sum(int *l1, int *l2, int len) {
+static inline int weighted_sum(uint16_t *l, const int8_t *weights, uint16_t len) {
     int sum = 0;
-    for (int i = 0; i < len; i++) {
-        sum += l1[i] * l2[i];
+    for (uint16_t i = 0; i < len; i++) {
+        sum += l[i] * weights[i];
     }
     return sum;
 }
 
 double energy(im_t *im, int x, int y) {
-    const int x_weights[9] = {1, 0, -1, 2, 0, -2, 1, 0, -1};
-    const int y_weights[9] = {1, 2, 1, 0, 0, 0, -1, -2, -1};
-    int width = im->width, height = im->height;
-    int brightnesses[9];
-    memset(&brightnesses, 0, 9 * sizeof(int));
+    const int8_t x_weights[9] = {1, 0, -1, 2, 0, -2, 1, 0, -1};
+    const int8_t y_weights[9] = {1, 2, 1, 0, 0, 0, -1, -2, -1};
+    uint16_t width = im->width, height = im->height;
+    uint16_t brightnesses[9];
+    memset(&brightnesses, 0, 9 * sizeof(uint16_t));
 
     for (int row_offset = -1; row_offset <= 1; row_offset++) {
         int row = y + row_offset;
@@ -141,57 +144,61 @@ double energy(im_t *im, int x, int y) {
         }
     }
 
-    int x_energy = weighted_sum(brightnesses, (int *)x_weights, 9);
-    int y_energy = weighted_sum(brightnesses, (int *)y_weights, 9);
+    int x_energy = weighted_sum(brightnesses, x_weights, 9);
+    int y_energy = weighted_sum(brightnesses, y_weights, 9);
 
     return sqrt(x_energy * x_energy + y_energy * y_energy);
 }
 
-double **energies_init(unsigned int width, unsigned int height) {
+double **energies_init(uint16_t width, uint16_t height) {
     double **energies = malloc(height * sizeof(double *));
-    for (unsigned int row = 0; row < height; row++) {
+    for (uint16_t row = 0; row < height; row++) {
         energies[row] = malloc(width * sizeof(double));
     }
     return energies;
 }
 
 void calculate_energies(double **energies, im_t *image) {
-    for (unsigned int row = 0; row < image->height; row++) {
-        for (unsigned int col = 0; col < image->width; col++) {
+    for (uint16_t row = 0; row < image->height; row++) {
+        for (uint16_t col = 0; col < image->width; col++) {
             energies[row][col] = energy(image, col, row);
         }
     }
 }
 
-void energies_destroy(double **energies, unsigned int original_height) {
-    for (unsigned int row = 0; row < original_height; row++) {
+void energies_destroy(double **energies, uint16_t original_height) {
+    for (uint16_t row = 0; row < original_height; row++) {
         free(energies[row]);
     }
     free(energies);
 }
 
-seams_t *seams_init(unsigned int width, unsigned int height) {
+seams_t *seams_init(uint16_t width, uint16_t height) {
     seams_t *seams = malloc(sizeof(seams_t));
     seams->current_row = malloc(width * sizeof(seam_t));
     seams->prev_row = malloc(width * sizeof(seam_t));
 
-    for (unsigned int col = 0; col < width; col++) {
-        seams->prev_row[col].positions = malloc(height * sizeof(int));
-        seams->current_row[col].positions = malloc(height * sizeof(int));
+    for (uint16_t col = 0; col < width; col++) {
+        seams->prev_row[col].positions = malloc(height * sizeof(uint16_t));
+        seams->current_row[col].positions = malloc(height * sizeof(uint16_t));
     }
     return seams;
 }
 
 void fill_seams(seams_t *seams, double **energies, im_t *image) {
-    unsigned int width = image->width, height = image->height;
+    uint16_t width = image->width, height = image->height;
 
-    for (unsigned int col = 0; col < width; col++) {
+    for (uint16_t col = 0; col < width; col++) {
         seams->prev_row[col].energy = energies[0][col];
         seams->prev_row[col].positions[0] = col;
     }
 
-    for (unsigned int row = 1; row < height; row++) {
-        for (unsigned int col = 0; col < width; col++) {
+    clock_t sum_rewrite = 0;
+    clock_t sum_findmin = 0;
+
+    for (uint16_t row = 1; row < height; row++) {
+        clock_t start3 = clock();
+        for (uint16_t col = 0; col < width; col++) {
             seam_t *min_seam = &seams->prev_row[col];
 
             seam_t *right = (col + 1 < width) ? &seams->prev_row[col + 1] : NULL;
@@ -202,20 +209,28 @@ void fill_seams(seams_t *seams, double **energies, im_t *image) {
 
             seams->current_row[col].energy = min_seam->energy + energies[row][col];
             memcpy(seams->current_row[col].positions, min_seam->positions,
-                   row * sizeof(unsigned int));
+                   row * sizeof(uint16_t));
             seams->current_row[col].positions[row] = col;
         }
-        for (unsigned int i = 0; i < width; i++) {
+        clock_t end3 = clock();
+        sum_findmin += (end3 - start3);
+        // printf("Time 3: %ld\n", (end3 - start3) * 1000 / CLOCKS_PER_SEC);
+        clock_t start4 = clock();
+        for (uint16_t i = 0; i < width; i++) {
             seams->prev_row[i].energy = seams->current_row[i].energy;
             memcpy(seams->prev_row[i].positions, seams->current_row[i].positions,
-                   (row + 1) * sizeof(unsigned int));
+                   (row + 1) * sizeof(uint16_t));
         }
+        clock_t end4 = clock();
+        sum_rewrite += end4 - start4;
+        // printf("Time 4: %ld\n", (end4 - start4) * 1000 / CLOCKS_PER_SEC);
     }
+    printf("Min time: %ld, Rewrite time: %ld\n", sum_findmin * 1000 / CLOCKS_PER_SEC, sum_rewrite * 1000 / CLOCKS_PER_SEC);
 }
 
 void remove_seam(im_t *image, seam_t *seam) {
-    for (unsigned int row = 0; row < image->height; row++) {
-        unsigned int to_remove = seam->positions[row];
+    for (uint16_t row = 0; row < image->height; row++) {
+        uint16_t to_remove = seam->positions[row];
         memmove(&image->pixels[row][to_remove],
                 &image->pixels[row][to_remove + 1],
                 (image->width - to_remove - 1) * sizeof(rgb_pixel_t));
@@ -223,8 +238,8 @@ void remove_seam(im_t *image, seam_t *seam) {
     image->width--;
 }
 
-void seams_destroy(seams_t *seams, unsigned int original_width) {
-    for (unsigned int col = 0; col < original_width; col++) {
+void seams_destroy(seams_t *seams, uint16_t original_width) {
+    for (uint16_t col = 0; col < original_width; col++) {
         free(seams->prev_row[col].positions);
         free(seams->current_row[col].positions);
     }
@@ -233,8 +248,8 @@ void seams_destroy(seams_t *seams, unsigned int original_width) {
     free(seams);
 }
 
-void image_destroy(im_t *image, unsigned int original_height) {
-    for (unsigned int row = 0; row < original_height; row++) {
+void image_destroy(im_t *image, uint16_t original_height) {
+    for (uint16_t row = 0; row < original_height; row++) {
         free(image->pixels[row]);
     }
     free(image->pixels);
