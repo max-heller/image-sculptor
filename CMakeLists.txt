@@ -7,8 +7,13 @@ set(EXECUTABLE_OUTPUT_PATH ${CMAKE_SOURCE_DIR}/bin)
 
 include_directories(include src libs)
 
-add_executable(sculptor src/main.cpp src/computations.cpp src/seam.cpp)
-add_executable(test tests/main.cpp tests/tests.cpp src/seam.cpp src/computations.cpp)
+file(GLOB SRC src/*)
+file(GLOB TEST_SRC src/*)
+list(FILTER TEST_SRC EXCLUDE REGEX "main.cpp")
+file(GLOB TESTS tests/*)
+
+add_executable(sculptor ${SRC})
+add_executable(test ${TESTS} ${TEST_SRC})
 
 find_package(X11 REQUIRED)
 include_directories(${X11_INCLUDE_DIR})
