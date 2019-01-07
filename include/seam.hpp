@@ -2,10 +2,13 @@
 using namespace std;
 
 class Seam {
-  public:
     float total_energy;
     vector<int> positions;
+
+  public:
     Seam(int height);
     friend bool operator<(const Seam &s1, const Seam &s2);
-    void update(int row, int col, float energy);
+    float getEnergy() { return total_energy; };
+    vector<int> &getPositions() { return positions; };
+    void update(int col, float energy);
 };

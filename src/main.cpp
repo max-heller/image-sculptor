@@ -29,10 +29,10 @@ int main(int argc, char *argv[]) {
 
         auto min_seam = find_lowest_energy_seam(energies);
 
-        for (auto i : min_seam.positions) {
+        for (auto i : min_seam.getPositions()) {
             cout << i << endl;
         }
-        cout << "Energy: " << min_seam.total_energy << endl;
+        cout << "Energy: " << min_seam.getEnergy() << endl;
     }
     return 0;
 }

@@ -38,8 +38,7 @@ build/*
 *.i*86
 *.x86_64
 *.hex
-sculptor
-sculptor-perf
+bin/*
 
 # Debug files
 *.dSYM/

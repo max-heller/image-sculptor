@@ -6,7 +6,7 @@ Seam find_lowest_energy_seam(CImg<float> &energies) {
     vector<Seam> prev_row(width, Seam(height)), current_row(width, Seam(height));
 
     for (int col = 0; col < width; col++) {
-        prev_row[col].update(0, col, energies(col, 0));
+        prev_row[col].update(col, energies(col, 0));
     }
 
     for (int row = 1; row < height; row++) {
@@ -16,7 +16,7 @@ Seam find_lowest_energy_seam(CImg<float> &energies) {
             auto min_prev =
                 min_element(begin(prev_row) + start, begin(prev_row) + end);
             current_row[col] = *min_prev;
-            current_row[col].update(row, col, energies(col, row));
+            current_row[col].update(col, energies(col, row));
         }
         if (row != height - 1)
             swap(current_row, prev_row);
