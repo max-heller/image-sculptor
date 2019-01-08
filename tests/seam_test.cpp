@@ -25,4 +25,5 @@ TEST_CASE("Seam Comparison") {
     s1.update(5, 10.2);
     s2.update(4, 4.5);
     REQUIRE(s2 < s1);
+    REQUIRE(!(s1 < s2));
 }
