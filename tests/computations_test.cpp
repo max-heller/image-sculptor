@@ -48,3 +48,48 @@ TEST_CASE("Energy Computation") {
         REQUIRE(energy(2,2) == 0.0);
     }
 }
+
+TEST_CASE("Seam Finding") {
+    SECTION("Uniform 0 energy") {
+        CImg<float> energy(3,3,1,1);
+        energy.fill(0.0);
+        auto s = find_lowest_energy_seam(energy);
+        vector<int> p = {0,0,0};
+        REQUIRE(equal(p.begin(), p.end(), s.getPositions().begin()));
+    }
+    SECTION("Lowest is last column") {
+        CImg<float> energy(3,3,1,1);
+        energy.fill(100.0, 50.0, 25.0);
+        auto s = find_lowest_energy_seam(energy);
+        vector<int> p = {2,2,2};
+        REQUIRE(equal(p.begin(), p.end(), s.getPositions().begin()));
+    }
+    SECTION("Lowest is first column") {
+        CImg<float> energy(3,3,1,1);
+        energy.fill(10.0, 50.0, 25.0);
+        auto s = find_lowest_energy_seam(energy);
+        vector<int> p = {0,0,0};
+        REQUIRE(equal(p.begin(), p.end(), s.getPositions().begin()));
+    }
+    SECTION("Lowest is non-linear 1") {
+        CImg<float> energy(3,3,1,1);
+        energy.fill(10.0, 50.0, 25.0, 50.0);
+        auto s = find_lowest_energy_seam(energy);
+        vector<int> p = {0,1,2};
+        REQUIRE(equal(p.begin(), p.end(), s.getPositions().begin()));
+    }
+    SECTION("Lowest is non-linear 2") {
+        CImg<float> energy(3,3,1,1);
+        energy.fill(10.0, 50.0, 25.0, 10.0);
+        auto s = find_lowest_energy_seam(energy);
+        vector<int> p = {0,0,1};
+        REQUIRE(equal(p.begin(), p.end(), s.getPositions().begin()));
+    }
+    SECTION("Lowest is non-linear 3") {
+        CImg<float> energy(3,3,1,1);
+        energy.fill(10.0, 50.0, 25.0, 50.0, 50.0);
+        auto s = find_lowest_energy_seam(energy);
+        vector<int> p = {2,2,1};
+        REQUIRE(equal(p.begin(), p.end(), s.getPositions().begin()));
+    }
+}
