@@ -1,5 +1,7 @@
+#include "CImg.hpp"
 #include <vector>
 using namespace std;
+using namespace cimg_library;
 
 class Seam {
     float total_energy;
@@ -11,4 +13,5 @@ class Seam {
     float getEnergy() { return total_energy; };
     vector<int> &getPositions() { return positions; };
     void update(int col, float energy);
+    CImg<unsigned char> removeFrom(CImg<unsigned char> &img);
 };

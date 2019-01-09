@@ -8,13 +8,13 @@ using namespace std;
 using namespace std::chrono;
 
 int main(int argc, char *argv[]) {
-    if (argc != 3) {
-        cout << "Usage: ./sculptor in_file num_seams" << endl;
+    if (argc != 4) {
+        cout << "Usage: ./sculptor in_file out_file num_seams" << endl;
         return -1;
     }
 
-    char *in_file = argv[1];
-    int num_seams = atoi(argv[2]);
+    char *in_file = argv[1], *out_file = argv[2];
+    int num_seams = atoi(argv[3]);
     assert(num_seams >= 0);
 
     CImg<unsigned char> img(in_file);
@@ -27,12 +27,21 @@ int main(int argc, char *argv[]) {
         cout << "Time taken by energy: "
              << duration.count() << " microseconds" << endl;
 
-        auto min_seam = find_lowest_energy_seam(energy);
+        start = high_resolution_clock::now();
+        Seam min_seam = find_lowest_energy_seam(energy);
+        stop = high_resolution_clock::now();
+        duration = duration_cast<microseconds>(stop - start);
+        cout << "Time taken by seam finding: "
+             << duration.count() << " microseconds" << endl;
 
-        for (auto i : min_seam.getPositions()) {
-            cout << i << endl;
-        }
-        cout << "Energy: " << min_seam.getEnergy() << endl;
+        start = high_resolution_clock::now();
+        min_seam.removeFrom(img).move_to(img);
+        stop = high_resolution_clock::now();
+        duration = duration_cast<microseconds>(stop - start);
+        cout << "Time taken by removal: "
+             << duration.count() << " microseconds" << endl;
     }
+
+    img.save(out_file);
     return 0;
 }
