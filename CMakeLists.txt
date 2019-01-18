@@ -14,17 +14,21 @@ file(GLOB TESTS tests/*)
 
 add_executable(sculptor ${SRC})
 add_executable(test ${TESTS} ${TEST_SRC})
+add_executable(bench bench/benchmark.cpp ${TEST_SRC})
 
 find_package(X11 REQUIRED)
 include_directories(${X11_INCLUDE_DIR})
 target_link_libraries(sculptor ${X11_LIBRARIES})
 target_link_libraries(test ${X11_LIBRARIES})
+target_link_libraries(bench ${X11_LIBRARIES})
 
 find_package(JPEG REQUIRED)
 include_directories(${JPEG_INCLUDE_DIR})
 target_link_libraries(sculptor ${JPEG_LIBRARY})
 target_link_libraries(test ${JPEG_LIBRARY})
+target_link_libraries(bench ${JPEG_LIBRARY})
 
 find_package(Threads REQUIRED)
 target_link_libraries(sculptor Threads::Threads)
 target_link_libraries(test Threads::Threads)
+target_link_libraries(bench Threads::Threads)
