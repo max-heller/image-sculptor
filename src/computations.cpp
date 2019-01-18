@@ -31,11 +31,13 @@ Seam find_lowest_energy_seam(CImg<float> &energy) {
     }
 
     for (int row = 1; row < height; row++) {
-        for (int col = 0; col < width; col++) {
-            auto start = max(col - 1, 0);
-            auto end = min(col + 2, width);
-            auto min_prev =
-                min_element(begin(prev_row) + start, begin(prev_row) + end);
+        for (unsigned short int col = 0; col < width; col++) {
+            Seam *min_prev = &prev_row[col];
+            if (col - 1 >= 0 and not (*min_prev < prev_row[col - 1]))
+                min_prev = &prev_row[col - 1];
+            if (col + 1 < width and prev_row[col + 1] < *min_prev)
+                min_prev = &prev_row[col + 1];
+
             current_row[col] = *min_prev;
             current_row[col].update(col, energy(col, row));
         }
